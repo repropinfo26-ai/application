@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Complete your Re Prop agent application, upload your documents and sign online.">
+  <title>Agent application | Re Prop</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <div class="logo-crop" aria-label="Re Prop Property">
+        <img src="/assets/re-prop-logo.jpeg" alt="Re Prop Property">
+      </div>
+      <span class="header-caption">Agent application</span>
+    </div>
+  </header>
+
+  <main class="shell page-grid">
+    <aside class="intro-panel">
+      <span class="eyebrow">RE PROP · AGENT ONBOARDING</span>
+      <h1>Start your next chapter.</h1>
+      <p>Tell us about yourself, upload your documents and sign your application online.</p>
+      <div class="intro-rule"></div>
+      <div class="intro-points">
+        <div><span class="point-num">01</span><span>Your details and FFC information</span></div>
+        <div><span class="point-num">02</span><span>Your agreed commission splits</span></div>
+        <div><span class="point-num">03</span><span>Photo, ID and signature</span></div>
+      </div>
+      <p class="aside-note">Your application is subject to Re Prop approval and any required onboarding agreement.</p>
+    </aside>
+
+    <section class="form-panel" aria-label="Agent application form">
+      <div id="application-view">
+        <div class="form-topline">
+          <span class="step-count" id="step-count">STEP 01 OF 04</span>
+          <span class="time-note">Approximately 5 minutes</span>
+        </div>
+        <div class="progress" aria-hidden="true"><span id="progress-fill"></span></div>
+
+        <form id="application-form" novalidate>
+          <div class="step active" data-step="0">
+            <span class="section-kicker">THE BASICS</span>
+            <h2>Your details</h2>
+            <p class="step-description">Enter your details as they appear on your ID document.</p>
+            <div class="fields two-col">
+              <label class="field"><span>Name <b>*</b></span><input name="name" autocomplete="given-name" maxlength="80" required placeholder="Your first name"></label>
+              <label class="field"><span>Surname <b>*</b></span><input name="surname" autocomplete="family-name" maxlength="80" required placeholder="Your surname"></label>
+              <label class="field"><span>ID number <b>*</b></span><input name="idNumber" maxlength="40" required inputmode="numeric" autocomplete="off" placeholder="South African ID or passport number"></label>
+              <label class="field"><span>Contact number <b>*</b></span><input name="contactNumber" type="tel" maxlength="40" required autocomplete="tel" placeholder="Your mobile number"></label>
+              <label class="field full"><span>Residential address <b>*</b></span><textarea name="address" maxlength="500" required rows="3" autocomplete="street-address" placeholder="Street address, suburb, city and postal code"></textarea></label>
+              <label class="field full"><span>Preferred Re Prop email <b>*</b></span><span class="email-input"><input name="emailLocal" maxlength="88" required pattern="[-a-zA-Z0-9._]+" autocomplete="off" placeholder="name.surname"><span>@reprop.co.za</span></span><small>We will check availability during onboarding.</small></label>
+            </div>
+          </div>
+
+          <div class="step" data-step="1" hidden>
+            <span class="section-kicker">YOUR CREDENTIALS</span>
+            <h2>FFC &amp; mentor</h2>
+            <p class="step-description">Tell us your current FFC status and mentor details, if applicable.</p>
+            <div class="fields two-col">
+              <label class="field full"><span>FFC status <b>*</b></span><select name="ffcStatus" required><option value="">Select your FFC status</option><option>Current FFC</option><option>No FFC</option><option>Pending</option></select></label>
+              <label class="field"><span>FFC number</span><input name="ffcNumber" maxlength="60" placeholder="Your FFC number"></label>
+              <label class="field"><span>FFC expiry date</span><input name="ffcExpiry" type="date"></label>
+            </div>
+            <fieldset class="choice-group">
+              <legend>Is a mentor required? <b>*</b></legend>
+              <label class="choice"><input type="radio" name="mentorRequired" value="Yes" required><span>Yes</span></label>
+              <label class="choice"><input type="radio" name="mentorRequired" value="No"><span>No</span></label>
+            </fieldset>
+            <div class="fields two-col mentor-fields" id="mentor-fields" hidden>
+              <label class="field"><span>Mentor name <b>*</b></span><input name="mentorName" maxlength="120" placeholder="Name and surname"></label>
+              <label class="field"><span>Mentor FFC number</span><input name="mentorFfcNumber" maxlength="60" placeholder="Mentor FFC number"></label>
+              <label class="field"><span>Mentor contact <b>*</b></span><input name="mentorContact" type="tel" maxlength="40" placeholder="Contact number"></label>
+              <label class="field"><span>Mentor email</span><input name="mentorEmail" type="email" maxlength="120" placeholder="name@example.com"></label>
+            </div>
+          </div>
+
+          <div class="step" data-step="2" hidden>
+            <span class="section-kicker">COMMERCIAL TERMS</span>
+            <h2>Commission splits</h2>
+            <p class="step-description">Enter the agreed agent share. Re Prop’s share is calculated automatically. Each row totals 100%.</p>
+            <div class="split-card">
+              <div class="split-head"><strong>Sales</strong><span>Agent / Re Prop</span></div>
+              <div class="split-fields">
+                <label class="field"><span>Agent share <b>*</b></span><span class="percent-input"><input name="salesAgent" type="number" inputmode="decimal" min="0" max="100" step="0.01" required placeholder="75"><i>%</i></span></label>
+                <label class="field"><span>Re Prop share</span><span class="percent-input muted-input"><input name="salesCompany" readonly tabindex="-1" placeholder="—"><i>%</i></span></label>
+              </div>
+            </div>
+            <div class="split-card">
+              <div class="split-head"><strong>Rentals</strong><span>Agent / Re Prop</span></div>
+              <div class="split-fields">
+                <label class="field"><span>Agent share <b>*</b></span><span class="percent-input"><input name="rentalsAgent" type="number" inputmode="decimal" min="0" max="100" step="0.01" required placeholder="60"><i>%</i></span></label>
+                <label class="field"><span>Re Prop share</span><span class="percent-input muted-input"><input name="rentalsCompany" readonly tabindex="-1" placeholder="—"><i>%</i></span></label>
+              </div>
+            </div>
+            <p class="info-note">Your application records these terms for approval. They are subject to the final onboarding agreement.</p>
+          </div>
+
+          <div class="step" data-step="3" hidden>
+            <span class="section-kicker">FINAL STEP</span>
+            <h2>Documents &amp; signature</h2>
+            <p class="step-description">Upload a clear photo and ID copy, then sign in the box below.</p>
+            <div class="upload-grid">
+              <label class="upload-card" id="photo-card"><span class="upload-icon" aria-hidden="true">↥</span><strong>Applicant photo <b>*</b></strong><small>A clear headshot · JPG, PNG or WebP</small><span class="file-name" id="photo-name">Choose photo</span><input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label>
+              <label class="upload-card" id="id-card"><span class="upload-icon" aria-hidden="true">↥</span><strong>ID copy <b>*</b></strong><small>Clear photograph or PDF · front and back in one PDF if needed</small><span class="file-name" id="id-name">Choose ID file</span><input name="idDocument" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>
+            </div>
+            <p class="file-hint">Images are prepared for upload while keeping the text readable. PDFs must be 2.4 MB or less.</p>
+            <div class="signature-heading"><span>Applicant signature <b>*</b></span><button type="button" class="text-button" id="clear-signature">Clear signature</button></div>
+            <div class="signature-box"><canvas id="signature" aria-label="Draw your signature here"></canvas><span id="signature-hint">Sign here with your finger, mouse or trackpad</span></div>
+            <label class="confirmation"><input type="checkbox" name="agreed" required><span>I confirm that my information is accurate, that I agree to the commission splits shown above, and that this is my signature. <b>*</b></span></label>
+            <p class="privacy-note">Your ID, photo and signed application will be saved in your applicant folder for Re Prop’s onboarding review.</p>
+          </div>
+
+          <div id="form-error" class="error-box" role="alert" hidden></div>
+          <div class="form-actions"><button type="button" class="back-button" id="back" hidden>← Back</button><button type="button" class="next-button" id="next">Continue <span aria-hidden="true">→</span></button><button type="submit" class="next-button" id="submit" hidden>Sign &amp; submit <span aria-hidden="true">→</span></button></div>
+        </form>
+      </div>
+
+      <div class="success" id="success-view" hidden tabindex="-1">
+        <div class="success-mark">✓</div>
+        <span class="section-kicker">APPLICATION RECEIVED</span>
+        <h2>Thank you for applying.</h2>
+        <p>Your application, ID copy and photo have been submitted for Re Prop’s review.</p>
+        <div class="reference"><span>Your reference number</span><strong id="application-id"></strong></div>
+        <p class="success-small">Keep this reference number for any follow-up.</p>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer shell">© Re Prop Property · Agent applications</footer>
+</body>
+</html>
