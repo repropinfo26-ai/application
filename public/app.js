@@ -346,3 +346,25 @@ form.addEventListener('submit', async event => {
 updateMentorFields();
 updateFfcFields();
 showStep(0, false);
+
+async function checkServiceAvailability() {
+  const notice = document.getElementById('service-check');
+  try {
+    const response = await fetch('/api/submit', {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
+    const status = await response.json();
+    if (!response.ok || status?.acceptingApplications !== true) {
+      throw new Error('Applications are temporarily unavailable. Please contact Re Prop.');
+    }
+    notice.hidden = true;
+    form.hidden = false;
+  } catch {
+    notice.textContent = 'Applications are temporarily unavailable. Please contact Re Prop.';
+    notice.classList.add('unavailable');
+  }
+}
+
+checkServiceAvailability();

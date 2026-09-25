@@ -1,5 +1,5 @@
 const DEFAULT_APPS_SCRIPT_URL =
-  'https://script.google.com/macros/s/AKfycbx_oskzxEmhTpYsEloIKwxvWhmJPEsVx2UZuO6QW3hC7fz9KLxfzm8ZaB_4Gvk5y1B8/exec';
+  'https://script.google.com/macros/s/AKfycbxRWwn5vtShK0i3YMZHEZoIOOpudPK5OV328Z3bQQHRvNmGo8CirRXXWZMBDygvO8qq/exec';
 
 const MAX_REQUEST_BYTES = 5_500_000;
 const JSON_HEADERS = {
@@ -11,6 +11,26 @@ const reply = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
 
 export default async function handler(request) {
+  const apiKey = process.env.APPS_SCRIPT_API_KEY || process.env.APPLICATION_API_KEY;
+  const endpoint = process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL;
+
+  if (request.method === 'GET') {
+    if (!apiKey) return reply({ ok: true, acceptingApplications: false });
+    try {
+      const check = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ apiKey, action: 'health' }),
+        redirect: 'follow',
+        signal: AbortSignal.timeout(10_000),
+      });
+      const result = await check.json();
+      return reply({ ok: true, acceptingApplications: check.ok && result.ok === true && result.authenticated === true });
+    } catch {
+      return reply({ ok: true, acceptingApplications: false });
+    }
+  }
+
   if (request.method !== 'POST') {
     return reply({ ok: false, error: 'Method not allowed.' }, 405);
   }
@@ -46,12 +66,10 @@ export default async function handler(request) {
     return reply({ ok: false, error: 'Complete the form, files and signature.' }, 400);
   }
 
-  const apiKey = process.env.APPS_SCRIPT_API_KEY;
   if (!apiKey) {
     return reply({ ok: false, error: 'This form is not configured yet. Please contact Re Prop.' }, 503);
   }
 
-  const endpoint = process.env.APPS_SCRIPT_URL || DEFAULT_APPS_SCRIPT_URL;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55_000);
 

@@ -1,14 +1,14 @@
 # Re Prop agent application
 
-The applicant fills in the four-step web form, uploads a photo and ID copy, and draws a signature. The Google Apps Script backend saves an editable Google Doc and signed PDF in a new applicant folder, writes a row to the `Applications` tab, and emails the PDF to `repropinfo26@gmail.com` and `tshidimunyai@gmail.com`.
+The applicant fills in the four-step web form, uploads a photo and ID copy, and draws a signature. The Google Apps Script backend saves an editable Google Doc and signed PDF in a new applicant folder, writes a row to the `Applications` tab (or `Online Agent Applications` if the original tab has other headers), and emails the PDF to `repropinfo26@gmail.com` and `tshidimunyai@gmail.com`.
 
 ## 1. Update the Google Apps Script
 
 1. Open the Apps Script project attached to the Re Prop application Google Sheet.
 2. Replace the existing code with **all** of `backend/Code.gs`.
-3. Save and run `setup()` once. Approve the new Mail permission requested by Google. This preserves existing applications and adds two email-status columns to the `Applications` tab.
+3. Save and run `setup()` once, then run `runBackendCheck()` and confirm the log says PASS. Approve the Google permissions. The check creates and then removes temporary files and a test row; it sends no email.
 4. Open **Deploy → Manage deployments**, edit the existing web app, select **New version**, and deploy. Keep execution as **Me** and access as **Anyone** so the Netlify server function can submit applications.
-5. Keep the `/exec` URL. This package uses the current URL ending in `Gvk5y1B8/exec`, already configured in `netlify/functions/submit.mjs`.
+5. The Netlify function now points to the new `/exec` URL ending in `vO8qq/exec`.
 
 If `setup()` created an API key before, it is unchanged. Run `showApiKey()` in Apps Script if you need to see it again. Keep it private.
 
@@ -20,10 +20,14 @@ Create a private GitHub repository and upload the **contents of this folder** to
 
 1. In Netlify, add a new project from your GitHub repository.
 2. The `netlify.toml` file supplies the publish directory (`public`) and functions directory (`netlify/functions`). No build command or package installation is needed.
-3. Under **Site configuration → Environment variables**, add `APPS_SCRIPT_API_KEY` with the value shown by Apps Script `setup()` or `showApiKey()`. Make it available to Functions. The key is only read by the server function, never the applicant's browser.
-4. Deploy the site. Netlify will serve the form and route `/api/submit` to the server function.
+3. In the Netlify account that owns this exact site, open **Project configuration → Environment variables** and add `APPS_SCRIPT_API_KEY` with the value shown by Apps Script `setup()` or `showApiKey()`. Make it available to **Functions** and **Production** (or all deploy contexts). The key is only read by the server function, never the applicant's browser. If an earlier setup used the name `APPLICATION_API_KEY`, that name is also accepted by this package.
+4. Trigger a **new production deploy** after saving the environment variable. Netlify will serve the form and route `/api/submit` to the server function.
 
-You can optionally set `APPS_SCRIPT_URL` in Netlify if the Apps Script deployment URL changes. It overrides the URL already in `submit.mjs`. If you previously set this variable, update it to the current URL ending in `Gvk5y1B8/exec` or remove it.
+You can optionally set `APPS_SCRIPT_URL` in Netlify if the Apps Script deployment URL changes. It overrides the URL already in `submit.mjs`. If you previously set this variable, update it to the current URL ending in `vO8qq/exec` or remove it. The backend URL currently bundled with this project is `https://script.google.com/macros/s/AKfycbxRWwn5vtShK0i3YMZHEZoIOOpudPK5OV328Z3bQQHRvNmGo8CirRXXWZMBDygvO8qq/exec`.
+
+Before accepting public applications, check **Project configuration → General → Visitor access → Password Protection** for the Netlify site. Team login protection on production prevents anonymous applicants from reaching `/api/submit`. Test that path in a private browser window: it should return JSON rather than a Netlify login page.
+
+You can check `https://YOUR-SITE.netlify.app/api/submit` in a browser. It returns `acceptingApplications: true` only when the function can authenticate with the Apps Script backend. It never displays the key. If it says `false`, check the variable and URL in the Netlify account that owns the project, then deploy again. The application form also checks this before accepting documents.
 
 ## 4. Verify with a real test application
 

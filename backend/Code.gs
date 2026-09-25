@@ -1,7 +1,8 @@
 /**
  * RE PROP AGENT APPLICATION - GOOGLE APPS SCRIPT BACKEND
- * Run setup() once as the owner, then deploy as a web app.
- * The future Netlify function must POST JSON to the /exec URL with apiKey.
+ * Replace the entire Code.gs with this file. Run setup() and runBackendCheck()
+ * as the owner, then deploy a NEW VERSION of the web app.
+ * The Netlify function POSTs JSON to the /exec URL with apiKey.
  * Do not put the apiKey in browser code or a public GitHub repository.
  */
 
@@ -9,6 +10,7 @@ const CONFIG = Object.freeze({
   spreadsheetId: '1DKns7bvYoyNEfB6vbWBFi_OtpobnU8T3S7T4spcalsM',
   parentFolderId: '1lbtPEOTsXDarD42HtgTm-OutwLV0DsC2',
   sheetName: 'Applications',
+  fallbackSheetName: 'Online Agent Applications',
   timeZone: 'Africa/Johannesburg',
   maxPhotoBytes: 5 * 1024 * 1024,
   maxIdBytes: 8 * 1024 * 1024,
@@ -41,22 +43,24 @@ function setup() {
   if (!key) {
     key = Utilities.getUuid() + Utilities.getUuid();
     PropertiesService.getScriptProperties().setProperty('APPLICATION_API_KEY', key);
-    Logger.log('Save this API key privately for the Netlify environment variable: %s', key);
+    Logger.log('In the Netlify project for the form, add environment variable APPS_SCRIPT_API_KEY with this private value: %s', key);
   } else {
     Logger.log('API key already exists. Run showApiKey() if you need to retrieve it.');
   }
   Logger.log('Ready. Sheet: %s | Parent folder: %s', sheet.getName(), root.getName());
+  return { ok: true, sheet: sheet.getName(), folder: root.getName() };
 }
 
 /** Run manually as the script owner only. Never paste the output into GitHub. */
 function showApiKey() {
   const key = PropertiesService.getScriptProperties().getProperty('APPLICATION_API_KEY');
   if (!key) throw new Error('Run setup() first.');
-  Logger.log('APPLICATION_API_KEY: %s', key);
+  Logger.log('Netlify environment variable APPS_SCRIPT_API_KEY: %s', key);
 }
 
 function doGet() {
-  return json_({ ok: true, service: 'Re Prop agent applications' });
+  return json_({ ok: true, service: 'Re Prop agent applications', version: 'backend-v3',
+    configured: Boolean(PropertiesService.getScriptProperties().getProperty('APPLICATION_API_KEY')) });
 }
 
 function doPost(e) {
@@ -66,6 +70,11 @@ function doPost(e) {
     const storedKey = PropertiesService.getScriptProperties().getProperty('APPLICATION_API_KEY');
     if (!storedKey || !payload || payload.apiKey !== storedKey) {
       throw new Error('Not authorised.');
+    }
+    if (payload.action === 'health') {
+      const sheet = getApplicationsSheet_(SpreadsheetApp.openById(CONFIG.spreadsheetId));
+      DriveApp.getFolderById(CONFIG.parentFolderId).getName();
+      return json_({ ok: true, authenticated: true, version: 'backend-v3', sheet: sheet.getName() });
     }
     return json_(saveApplication_(payload));
   } catch (error) {
@@ -84,9 +93,12 @@ function saveApplication_(payload) {
 
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
+  let folder = null;
+  let documentFile = null;
+  let saved = false;
   try {
     const sheet = getApplicationsSheet_(SpreadsheetApp.openById(CONFIG.spreadsheetId));
-    const prior = sheet.getRange(2, 2, Math.max(1, sheet.getLastRow() - 1), 1)
+    const prior = sheet.getLastRow() < 2 ? null : sheet.getRange(2, 2, sheet.getLastRow() - 1, 1)
       .createTextFinder(applicant.requestId).matchEntireCell(true).findNext();
     if (prior && prior.getRow() <= sheet.getLastRow()) {
       const oldRow = sheet.getRange(prior.getRow(), 1, 1, HEADERS.length).getValues()[0];
@@ -97,14 +109,14 @@ function saveApplication_(payload) {
     const submittedAt = Utilities.formatDate(now, CONFIG.timeZone, 'yyyy-MM-dd HH:mm:ss');
     const applicationId = 'APP-' + Utilities.formatDate(now, CONFIG.timeZone, 'yyyyMMdd') + '-' + Utilities.getUuid().slice(0, 8).toUpperCase();
     const folderName = safeFileName_(applicant.name + ' ' + applicant.surname) + ' - ' + applicationId;
-    const folder = DriveApp.getFolderById(CONFIG.parentFolderId).createFolder(folderName);
+    folder = DriveApp.getFolderById(CONFIG.parentFolderId).createFolder(folderName);
 
     // Store originals as private files; sharing inherits the parent folder's permissions.
     const photoFile = folder.createFile(photo.blob.setName('Applicant photo.' + photo.extension));
     const idFile = folder.createFile(idCopy.blob.setName('ID document.' + idCopy.extension));
     const document = createApplicationDocument_(applicant, applicationId, submittedAt, signature.blob, folder);
-    const docFile = DriveApp.getFileById(document.getId());
-    const pdfFile = folder.createFile(docFile.getAs(MimeType.PDF)
+    documentFile = DriveApp.getFileById(document.getId());
+    const pdfFile = folder.createFile(documentFile.getAs(MimeType.PDF)
       .setName('Signed Agent Application - ' + applicationId + '.pdf'));
 
     const row = [
@@ -116,12 +128,13 @@ function saveApplication_(payload) {
       applicant.mentorEmail, applicant.salesAgent, applicant.salesCompany,
       applicant.rentalsAgent, applicant.rentalsCompany, submittedAt,
       '', folder.getUrl(), photoFile.getUrl(),
-      idFile.getUrl(), pdfFile.getUrl(), docFile.getUrl(), '', ''
+      idFile.getUrl(), pdfFile.getUrl(), documentFile.getUrl(), '', ''
     ];
     const nextRow = sheet.getLastRow() + 1;
     sheet.getRange(nextRow, 1, 1, HEADERS.length).setNumberFormat('@');
     sheet.getRange(nextRow, 1, 1, HEADERS.length).setValues([row.map(sheetSafe_)]);
     SpreadsheetApp.flush();
+    saved = true;
     try {
       sendNotificationsForRow_(sheet, nextRow);
     } catch (error) {
@@ -130,6 +143,13 @@ function saveApplication_(payload) {
       try { sheet.getRange(nextRow, 4).setValue('Submitted - email issue'); } catch (_) {}
     }
     return { ok: true, applicationId: applicationId };
+  } catch (error) {
+    // Failed attempts leave no misleading applicant folder if a row was never saved.
+    if (!saved) {
+      try { if (documentFile) documentFile.setTrashed(true); } catch (_) {}
+      try { if (folder) folder.setTrashed(true); } catch (_) {}
+    }
+    throw error;
   } finally {
     lock.releaseLock();
   }
@@ -138,6 +158,14 @@ function saveApplication_(payload) {
 function getApplicationsSheet_(spreadsheet) {
   let sheet = spreadsheet.getSheetByName(CONFIG.sheetName);
   if (!sheet) sheet = spreadsheet.insertSheet(CONFIG.sheetName);
+  // An existing Applications tab may contain the owner's original spreadsheet.
+  // Preserve it and use a separate tab for online submissions when needed.
+  const firstCells = sheet.getRange(1, 1, 1, Math.min(4, sheet.getMaxColumns())).getDisplayValues()[0];
+  if (firstCells.some(function (value) { return value !== ''; }) &&
+      firstCells.some(function (value, index) { return value !== HEADERS[index]; })) {
+    sheet = spreadsheet.getSheetByName(CONFIG.fallbackSheetName) ||
+      spreadsheet.insertSheet(CONFIG.fallbackSheetName);
+  }
   if (sheet.getMaxColumns() < HEADERS.length) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), HEADERS.length - sheet.getMaxColumns());
   }
@@ -147,7 +175,7 @@ function getApplicationsSheet_(spreadsheet) {
     sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold').setBackground('#17324d').setFontColor('#ffffff');
     sheet.setFrozenRows(1);
   } else if (HEADERS.slice(0, 29).some(function (header, index) { return existing[index] !== header; })) {
-    throw new Error('The Applications tab has different headers. Use a fresh tab or correct the header row.');
+    throw new Error('The online applications tab has unexpected headers. Run setup() to inspect it.');
   } else if (existing[29] === '' && existing[30] === '') {
     // Upgrade the tab created by the previous backend without changing any application rows.
     sheet.getRange(1, 30, 1, 2).setValues([HEADERS.slice(29)]);
@@ -156,6 +184,55 @@ function getApplicationsSheet_(spreadsheet) {
     throw new Error('The Applications tab has different email-status headers.');
   }
   return sheet;
+}
+
+/** Run manually after setup(). Checks real Google permissions and PDF creation.
+ * Creates then removes a test folder, document, PDF and sheet row. Sends no email.
+ */
+function runBackendCheck() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let folder = null;
+  let docFile = null;
+  let sheet = null;
+  let testRow = null;
+  const checkId = 'CHECK-' + Utilities.getUuid();
+  try {
+    if (!PropertiesService.getScriptProperties().getProperty('APPLICATION_API_KEY')) {
+      throw new Error('Run setup() first: the API key is missing.');
+    }
+    sheet = getApplicationsSheet_(SpreadsheetApp.openById(CONFIG.spreadsheetId));
+    const parent = DriveApp.getFolderById(CONFIG.parentFolderId);
+    folder = parent.createFolder('Backend check - ' + checkId);
+    const doc = DocumentApp.create('Backend check - ' + checkId);
+    doc.getBody().appendParagraph('Backend check: ' + checkId);
+    doc.saveAndClose();
+    docFile = DriveApp.getFileById(doc.getId());
+    docFile.moveTo(folder);
+    const pdf = folder.createFile(docFile.getAs(MimeType.PDF).setName('Backend check.pdf'));
+    if (!pdf.getSize()) throw new Error('PDF conversion returned an empty file.');
+    testRow = sheet.getLastRow() + 1;
+    sheet.getRange(testRow, 1, 1, HEADERS.length).setValues([HEADERS.map(function (_, i) {
+      return i === 1 ? checkId : '';
+    })]);
+    SpreadsheetApp.flush();
+    const mailQuota = MailApp.getRemainingDailyQuota(); // Also authorises MailApp.
+    Logger.log('PASS: Sheet %s, folder %s, Google Doc, PDF and MailApp (remaining recipient quota: %s).',
+      sheet.getName(), parent.getName(), mailQuota);
+    return { ok: true, sheet: sheet.getName(), mailQuota: mailQuota };
+  } catch (error) {
+    Logger.log('BACKEND CHECK FAILED: %s', error && error.stack ? error.stack : error);
+    throw error;
+  } finally {
+    try {
+      if (sheet && testRow && String(sheet.getRange(testRow, 2).getValue()) === checkId) {
+        sheet.deleteRow(testRow);
+      }
+    } catch (cleanupError) { Logger.log('Remove test sheet row manually: %s', cleanupError); }
+    try { if (docFile) docFile.setTrashed(true); } catch (_) {}
+    try { if (folder) folder.setTrashed(true); } catch (_) {}
+    lock.releaseLock();
+  }
 }
 
 /** Run manually if any application has an unsent or failed email notification. */
